@@ -5,6 +5,7 @@ import html
 
 import re
 import nltk
+# nltk.download("punkt")
 from xlrd import open_workbook
 from nltk.stem.snowball import SnowballStemmer
 from gensim import corpora, models
@@ -12,11 +13,11 @@ from gensim.models.ldamulticore import LdaMulticore
 from gensim.models import LdaModel as LMSingle
 from gensim.models.coherencemodel import CoherenceModel
 import argparse
-import pyLDAvis.gensim as ldvis
 import pyLDAvis
+import pyLDAvis.gensim_models as ldvis
 import pandas as pd
-import  random
-import  gensim
+import random
+import gensim
 
 # create English stop words list
 
@@ -35,21 +36,21 @@ my_stopwords = ['ourselves', 'hers', 'between', 'yourself', 'but', 'again', 'the
                 'against', 'a', 'by', 'doing', 'it', 'how', 'further', 'was', 'here', 'than', 'xa', 'use']
 
 domain_terms = ['monero', 'bitcoin', 'blockchain', 'ethereum', 'xmr', 'btc', 'eth', 'block',
-    'coin','bitcoins','blocks','ether','ethers']
+                'coin', 'bitcoins', 'blocks', 'ether', 'ethers']
 
 stemmer = SnowballStemmer("english")
 
+
 def sent_to_words(sentences):
     for sentence in sentences:
-        yield(gensim.utils.simple_preprocess(str(sentence), deacc=True))
+        yield (gensim.utils.simple_preprocess(str(sentence), deacc=True))
+
 
 def replace_bigram(texts):
-
-    bigram=gensim.models.Phrases(texts,min_count=20, threshold=10)
-    #print(bigram.vocab.items())
-    mod=[ bigram[sent] for sent in texts]
+    bigram = gensim.models.Phrases(texts, min_count=20, threshold=10)
+    #print("bigram: " + bigram.vocab.items().__str__())
+    mod = [bigram[sent] for sent in texts]
     return mod
-
 
 
 def stem_tokens(tokens):
@@ -101,12 +102,14 @@ def preprocess_text(text):
     # comments=text
     tokens = tokenize(text)
     tokens = remove_stopwords(tokens)
-    tokens = remove_domainterms(tokens)
+    #tokens = remove_domainterms(tokens)
     stems = stem_tokens(tokens)
-    return  stems
+    return stems
+
 
 def get_random_number():
-    return random.randint(0,50000)
+    return random.randint(0, 50000)
+
 
 class LDADocument:
     def __init__(self, id, posttype, body):
@@ -116,15 +119,14 @@ class LDADocument:
 
 
 class SEALDAModel:
-    def __init__(self, training_data=None, num_topics=10, fileprefix='bitcoin',
+    def __init__(self, training_data=None, num_topics=10, fileprefix='graphql',
                  use_multicore=True, coherence=0.6, core=24, iterations=100):
         self.num_topics = num_topics
         self.fileprefix = fileprefix
-        self.use_multicore=use_multicore
-        self.target_coherence=coherence
-        self.workers=core
-        self.iterations=iterations
-
+        self.use_multicore = use_multicore
+        self.target_coherence = coherence
+        self.workers = core
+        self.iterations = iterations
 
         if (training_data is None):
             self.training_data = self.read_data_from_oracle()
@@ -132,12 +134,13 @@ class SEALDAModel:
             self.training_data = training_data
 
         self.model = self.create_model_from_training_data()
-        coherence=self.compute_coherence()
-        while(coherence<self.target_coherence):
+        coherence = self.compute_coherence()
+
+        while (coherence < self.target_coherence):
             print("Random seed: " + str(self.seed))
-            print("Coherence score: "+str(coherence))
-            self.model=self.prepare_model(self.num_topics)
-            coherence=self.compute_coherence()
+            print("Coherence score: " + str(coherence))
+            self.model = self.prepare_model(self.num_topics)
+            coherence = self.compute_coherence()
 
     def get_model(self):
         return self.model
@@ -161,7 +164,6 @@ class SEALDAModel:
             document_ids.append(document.id)
         self.document_ids = document_ids
 
-
         doc_collection = []
         for text in training_documents:
             collection = preprocess_text(text)
@@ -176,30 +178,49 @@ class SEALDAModel:
 
     def prepare_model(self, topics_count):
         self.seed = get_random_number()
-        if(self.use_multicore):
-            ldamodel = LdaMulticore(self.corpus, num_topics=topics_count, id2word=self.dictionary,
-                                passes=50, workers=self.workers, alpha='symmetric', random_state=self.seed,
-                                    eta='auto', iterations=self.iterations)
+        if (self.use_multicore):
+            ldamodel = LdaMulticore(self.corpus,
+                                    num_topics=topics_count,
+                                    id2word=self.dictionary,
+                                    passes=50,
+                                    workers=self.workers,
+                                    alpha='symmetric',
+                                    random_state=self.seed,
+                                    eta='auto',
+                                    iterations=self.iterations)
             return ldamodel
         else:
-            ldamodel = LMSingle(corpus =self.corpus, num_topics=topics_count, id2word=self.dictionary,
-                                random_state=self.seed, passes=50, alpha='auto', eta='auto', iterations=self.iterations)
+            ldamodel = LMSingle(corpus=self.corpus,
+                                num_topics=topics_count,
+                                id2word=self.dictionary,
+                                random_state=self.seed,
+                                passes=50,
+                                alpha='auto',
+                                eta='auto',
+                                iterations=self.iterations)
             return ldamodel
 
     def compute_coherence(self):
-        coherencemodel = CoherenceModel(model=self.model, dictionary=self.dictionary, texts=self.token_collection, topn=10,
-                                            coherence='c_v')
+        coherencemodel = CoherenceModel(model=self.model, dictionary=self.dictionary, texts=self.token_collection,
+                                        topn=10,
+                                        coherence='c_v')
         value = coherencemodel.get_coherence()
         return value
 
     def read_data_from_oracle(self):
-        workbook = open_workbook(self.fileprefix+"-posts.xlsx")
+        workbook = open_workbook(self.fileprefix + "-posts.xls")
         sheet = workbook.sheet_by_index(0)
         model_data = []
         print("Reading data from oracle..")
         for cell_num in range(1, sheet.nrows):
-            comments = LDADocument(sheet.cell(cell_num, 0).value, sheet.cell(cell_num, 1).value,
-                                   sheet.cell(cell_num, 3).value)
+            id = sheet.cell(cell_num, 0).value
+            postType = sheet.cell(cell_num, 1).value
+            body = None
+            if(self.fileprefix.__eq__("graphql")):
+                body = sheet.cell(cell_num, 6).value
+            else:
+                body = sheet.cell(cell_num, 3).value
+            comments = LDADocument(id, postType, body)
             model_data.append(comments)
         return model_data
 
@@ -210,8 +231,7 @@ class SEALDAModel:
         df_dominant_topic.columns = ['Document_No', 'Dominant_Topic', 'Topic_Perc_Contrib', 'Keywords', 'Original_id']
 
         # Show
-        df_dominant_topic.to_csv(self.fileprefix+"-document-to-topic.csv")
-
+        df_dominant_topic.to_csv(self.fileprefix + "-document-to-topic.csv")
 
     def format_topics_sentences(self):
         # Init output
@@ -255,32 +275,25 @@ class SEALDAModel:
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='LDA Model')
-
-    parser.add_argument('--file', type=str,
-                        help='File prefix', default="bitcoin")
-
-    parser.add_argument('--multicore', type=bool,
-                        help='Iteration count', default=True)
-
-    parser.add_argument('--topic', type=int,
-                        help='Iteration count', default=10)
-    parser.add_argument('--coherence', type=float,
-                        help='Target coherence', default=0.6)
-    parser.add_argument('--core', type=int,
-                        help='CPU Threads', default=24)
-    parser.add_argument('--iteration', type=int,
-                        help='Number of iterations', default=100)
+    parser.add_argument('--file', type=str, help='File prefix', default="bitcoin")
+    parser.add_argument('--multicore', type=bool, help='Is Multicore', default=True)
+    parser.add_argument('--topic', type=int, help='Number of Topics', default=10)
+    parser.add_argument('--coherence', type=float, help='Target coherence', default=0.6)
+    parser.add_argument('--core', type=int, help='CPU Threads', default=24)
+    parser.add_argument('--iteration', type=int, help='Number of iterations', default=100)
 
     args = parser.parse_args()
-    project = args.file
-    multi_core=args.multicore
-    topics = args.topic
-    t_coherence=args.coherence
-    num_core=args.core
-    iter=args.iteration
+    print("args: " + args.__str__())
 
-    mymodel = SEALDAModel(num_topics=topics, fileprefix=project, use_multicore=multi_core,
-                          coherence=t_coherence, core=num_core, iterations=iter)
+    project = args.file
+    multi_core = args.multicore
+    topics = args.topic
+    t_coherence = args.coherence
+    num_core = args.core
+    iter = args.iteration
+
+    mymodel = SEALDAModel(num_topics=topics, fileprefix=project, use_multicore=multi_core, coherence=t_coherence,
+                          core=num_core, iterations=iter)
 
     mymodel.print_topics()
     print(mymodel.compute_coherence())
