@@ -17,30 +17,39 @@ import pyLDAvis.gensim_models as ldvis
 import pandas as pd
 import random
 import gensim
+from gensim.models import EnsembleLda
 
 # create English stop words list
 
+stemmer = SnowballStemmer("english")
+
 my_stopwords = ['ourselves', 'hers', 'between', 'yourself', 'but', 'again', 'there', 'about', 'once', 'during', 'out',
                 'very', 'having', 'with', 'they', 'own', 'an', 'be', 'some', 'for', 'do', 'its', 'yours', 'such',
-                'into', 'however', 'every'
+                'into', 'however', 'every', 'like', 'want', 'fine', 'one', 'two', 'make', 'thing', 'every', 'able'
                 'of', 'most', 'itself', 'other', 'off', 'is', 's', 'am', 'or', 'who', 'as', 'from', 'him', 'each',
-                'the',
+                'the', 'work', 'set', 'get', 'similar', 'change', 'must', 'above', 'both', 'need',
                 'themselves', 'until', 'below', 'are', 'we', 'these', 'your', 'his', 'through', 'don', 'nor', 'me',
                 'were', 'her', 'more', 'himself', 'this', 'down', 'should', 'could', 'would', 'our', 'their', 'while',
-                'above', 'both',
                 'up', 'to', 'ours', 'had', 'she', 'all', 'no', 'when', 'at', 'any', 'before', 'them', 'same', 'and',
                 'been', 'have', 'in', 'will', 'on', 'does', 'yourselves', 'then', 'that', 'because', 'what', 'over',
                 'why', 'so', 'can', 'did', 'not', 'now', 'under', 'he', 'you', 'herself', 'has', 'just', 'where', 'too',
                 'only', 'myself', 'which', 'those', 'i', 'after', 'few', 'whom', 't', 'being', 'if', 'theirs', 'my',
                 'against', 'a', 'by', 'doing', 'it', 'how', 'further', 'was', 'here', 'than', 'xa', 'use']
 
-domain_terms = ['want', 'graphql', 'fine', 'like', 'apollo', 'get', 'set', 'create', 'created', 'creating',
-                'application', 'app', 'call', 'change', 'able', 'ability', 'service', 'something', 'everything',
-                'problem', 'one', 'work', 'code', 'coding', 'gql', 'data', 'user', 'worked', 'working', 'works',
-                'make', 'making', 'makes', 'made', 'follow', 'followed', 'follows', 'thing', 'object', 'similar',
-                'project', 'two']
+stemmed_stopwords = []
 
-stemmer = SnowballStemmer("english")
+for i in my_stopwords:
+    stemmed_stopwords.append(stemmer.stem(i))
+
+domain_terms = ['graphql', 'apollo', 'application', 'app', 'service', 'code', 'gql', 'data', 'object', 'project',
+                'schema', 'return', 'name', 'run', 'implement', 'call', 'api', 'file', 'write', 'follow', 'new',
+                'update', 'generate', 'class', 'user']
+
+stemmed_domain_terms = []
+for i in domain_terms:
+    stemmed_domain_terms.append(stemmer.stem(i))
+
+
 
 def sent_to_words(sentences):
     for sentence in sentences:
@@ -61,12 +70,12 @@ def stem_tokens(tokens):
 
 
 def remove_stopwords(tokens):
-    stopped_tokens = [i for i in tokens if not i in my_stopwords]
+    stopped_tokens = [i for i in tokens if not i in stemmed_stopwords]
     return stopped_tokens
 
 
 def remove_domainterms(tokens):
-    newtokens = [i for i in tokens if not i in domain_terms]  # remove domain terms
+    newtokens = [i for i in tokens if not i in stemmed_domain_terms]  # remove domain terms
     return newtokens
 
 
@@ -101,10 +110,10 @@ def cleanup_text(text):
 def preprocess_text(text):
     # comments=text
     tokens = tokenize(text)
+    tokens = stem_tokens(tokens)
     tokens = remove_stopwords(tokens)
     tokens = remove_domainterms(tokens)
-    stems = stem_tokens(tokens)
-    return stems
+    return tokens
 
 
 def get_random_number():
@@ -119,7 +128,7 @@ class LDADocument:
 
 
 class SEALDAModel:
-    def __init__(self, training_data=None, num_topics=10, fileprefix='graphql',
+    def __init__(self, training_data=None, num_topics=10, fileprefix='bitcoin',
                  use_multicore=True, coherence=0.6, core=24, iterations=100):
         self.num_topics = num_topics
         self.fileprefix = fileprefix
@@ -135,34 +144,38 @@ class SEALDAModel:
 
         self.model = self.create_model_from_training_data()
 
-        NUMBER_OF_TOPICS = [12]
-        NUMBER_OF_ITERATIONS = [1000]
-        highest_coherence = 0
-        best_topics = -1
-        best_iterations = -1
+        print(len(self.model.ttda))
+        print(len(self.model.get_topics()))
 
-        for aNumberOfTopics in NUMBER_OF_TOPICS:
-            for aNumberOfIterations in NUMBER_OF_ITERATIONS:
-
-                print("----------------------------------------------------------------\nAttempting with #ofTopics: "
-                      + str(aNumberOfTopics) + " and #ofIterations: " + str(aNumberOfIterations))
-
-                self.model = self.prepare_model(aNumberOfTopics, aNumberOfIterations)
-                coherence = self.compute_coherence()
-                print("Coherence score: " + str(coherence))
-                print("Previous highest coherence score: " + str(highest_coherence))
-
-                if coherence > highest_coherence:
-                    highest_coherence = coherence
-                    best_topics = aNumberOfTopics
-                    best_iterations = aNumberOfIterations
-                    print("Best #ofTopics became: " + str(aNumberOfTopics))
-                    print("Best #ofTopics iterations became: " + str(aNumberOfIterations))
-
-        print("***************************************************************")
-        print("Best #ofTopics: " + str(best_topics))
-        print("Best #ofTopics iterations: " + str(best_iterations))
-        print("Best coherence: " + str(highest_coherence))
+        #
+        # NUMBER_OF_TOPICS = [12]
+        # NUMBER_OF_ITERATIONS = [1000]
+        # highest_coherence = 0
+        # best_topics = -1
+        # best_iterations = -1
+        #
+        # for aNumberOfTopics in NUMBER_OF_TOPICS:
+        #     for aNumberOfIterations in NUMBER_OF_ITERATIONS:
+        #
+        #         print("----------------------------------------------------------------\nAttempting with #ofTopics: "
+        #               + str(aNumberOfTopics) + " and #ofIterations: " + str(aNumberOfIterations))
+        #
+        #         self.model = self.prepare_model(aNumberOfTopics, aNumberOfIterations)
+        #         coherence = self.compute_coherence()
+        #         print("Coherence score: " + str(coherence))
+        #         print("Previous highest coherence score: " + str(highest_coherence))
+        #
+        #         if coherence > highest_coherence:
+        #             highest_coherence = coherence
+        #             best_topics = aNumberOfTopics
+        #             best_iterations = aNumberOfIterations
+        #             print("Best #ofTopics became: " + str(aNumberOfTopics))
+        #             print("Best #ofTopics iterations became: " + str(aNumberOfIterations))
+        #
+        # print("***************************************************************")
+        # print("Best #ofTopics: " + str(best_topics))
+        # print("Best #ofTopics iterations: " + str(best_iterations))
+        # print("Best coherence: " + str(highest_coherence))
 
     def get_model(self):
         return self.model
@@ -195,30 +208,42 @@ class SEALDAModel:
         self.dictionary = corpora.Dictionary(self.token_collection)
         self.dictionary.filter_extremes(no_below=20, no_above=0.2, keep_n=20000)
         self.corpus = [self.dictionary.doc2bow(text) for text in self.token_collection]
-        return self.prepare_model(self.num_topics, self.iterations)
 
-    def prepare_model(self, aNumberOfTopics, aNumberOfIterations):
+        return self.prepare_model()
+
+    def prepare_model(self):
         if (self.use_multicore):
             print('LDA MultiCore')
-            ldamodel = LdaMulticore(self.corpus,
-                                    num_topics=aNumberOfTopics,
-                                    id2word=self.dictionary,
-                                    passes=50,
-                                    workers=self.workers,
-                                    alpha='symmetric',
-                                    random_state=get_random_number(),
-                                    eta='auto',
-                                    iterations=aNumberOfIterations)
-            return ldamodel
+            # ldamodel = LdaMulticore(self.corpus,
+            #                         num_topics=self.num_topics,
+            #                         id2word=self.dictionary,
+            #                         passes=50,
+            #                         workers=self.workers,
+            #                         alpha='symmetric',
+            #                         random_state=get_random_number(),
+            #                         eta='auto',
+            #                         iterations=self.iterations)
+            return EnsembleLda(
+                epsilon=0.35,
+                min_samples=5,
+            corpus=self.corpus,
+            id2word=self.dictionary,
+            num_topics=self.num_topics,
+            passes=10,
+            num_models=8,
+            topic_model_class='ldamulticore',
+            ensemble_workers=self.workers,
+            distance_workers=self.workers)
+
         else:
             ldamodel = LMSingle(corpus=self.corpus,
-                                num_topics=aNumberOfTopics,
+                                num_topics=self.num_topics,
                                 id2word=self.dictionary,
                                 random_state=get_random_number(),
                                 passes=50,
                                 alpha='auto',
                                 eta='auto',
-                                iterations=aNumberOfIterations)
+                                iterations=self.iterations)
             return ldamodel
 
     def compute_coherence(self):
@@ -295,6 +320,8 @@ class SEALDAModel:
 
 
 if __name__ == '__main__':
+
+
     parser = argparse.ArgumentParser(description='LDA Model')
     parser.add_argument('--file', type=str, help='File prefix', default="bitcoin")
     parser.add_argument('--multicore', type=bool, help='Is Multicore', default=True)
